@@ -1,0 +1,23 @@
+<%- include('partials/header') %>
+<p class="centered"><h3>We have sent you a verification code!</h3></p>
+<!-- <p>Please enter the code here:</p> -->
+<div class="row">
+    <div class="col-sm-8">
+      <div class="card">
+        <div class="card-body">
+                    
+<form method="post" action="/verifyPhone">
+  <div class="form-group">
+      <label for="">Please enter the code here:</label>
+      <input  type="hidden" name="id" value=
+        <%- id %>
+        />
+      <input type="text" name="token" />
+      <input type="submit" value="Check code" />
+  </div>
+</form>
+ </div>
+</div>
+</div>
+</div>
+<%- include('partials/footer') %>
