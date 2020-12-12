@@ -25,6 +25,7 @@ cloudinary.config({
     api_key : process.env.cloudinary_cloud_key,
     api_secret: process.env.cloudinary_cloud_api_secret
 });
+
 app.use(fileupload({
     useTempFiles: true
 }));
@@ -232,17 +233,14 @@ app.post('/login' ,async (req,res) => {
     const phNo = userdetails.phNo;                                                                                              /// my modi
     const token = jwt.sign({ email : userdetails.email  , phNo: phNo } , privatekey);        /// my modi
     res.cookie('token' , token);
-    // res.redirect('/verifyPhone');
+    res.redirect('/verifyPhone');
     // res.redirect('/submit')
 })
 
-// abhi run karo toh and server share karna 
-  const port = process.env.PORT || 3000;
-  app.listen(port, (err) => {
+const port = process.env.PORT || 3000;
+app.listen(port, (err) => {
       if(!err)
       console.log('listening on port ' + port);
-  })
-// 
+})
 
-// set CLOUDINARY_URL=cloudinary://598792189368595:KXnbhwu-_IDDxJahGzG5bcYn8bw@pradhancloud
 
