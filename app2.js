@@ -9,15 +9,22 @@ const fileupload = require('express-fileupload');
 const cookieParser = require('cookie-parser');
 const cloudinary = require('cloudinary').v2;
 const bcrypt = require('bcrypt');
-const messagebird = require('messagebird')('dTJSsjKf6qqGoB27jy774lVCI') /// my modi
-const shortUrl = require('node-url-shortener')                          /// my modi
+var path = require('path');
+require('dotenv').config()
+const messagebird = require('messagebird')(process.env.messagebird_key) /// my modi
 
-cloudinary.config({
-    cloud_name: 'pradhancloud',
-    api_key : '598792189368595',
-    api_secret: 'KXnbhwu-_IDDxJahGzG5bcYn8bw'
+const Cryptr = require('cryptr');
+const cryptr = new Cryptr(process.env.cryptr_key);
+
+app.get('/index', function(req, res) {
+    res.sendFile(path.join(__dirname + '/index.html'));
 });
 
+cloudinary.config({
+    cloud_name: process.env.cloudinary_cloud,
+    api_key : process.env.cloudinary_cloud_key,
+    api_secret: process.env.cloudinary_cloud_api_secret
+});
 app.use(fileupload({
     useTempFiles: true
 }));
@@ -27,7 +34,7 @@ app.use(express.static("public"));
 app.set('view engine', "ejs");
 app.use(cookieParser());
 
-const connString = 'mongodb+srv://user_pradhan:TVI1DCfplDiuBLJw@cluster0.5kgs2.mongodb.net/userDB?retryWrites=true&w=majority';
+const connString = process.env.mongodb_key;
 
 mongoose.connect(connString, { useNewUrlParser: true, useUnifiedTopology: true, useCreateIndex: true })
     .then(() => console.log('db connected...'))
@@ -36,7 +43,7 @@ mongoose.connect(connString, { useNewUrlParser: true, useUnifiedTopology: true, 
 const userSchema = new mongoose.Schema({
     email: String,
     password: String,
-    phNo: String,                                           /// my modi
+    phNo: String,
     documents: {
         type : [String],
         default : []
@@ -58,7 +65,7 @@ app.get("/login",(req,res) => {
     res.render("login");
 });
 
-const privatekey = 'abc123';
+const privatekey = process.env.jwt_private_key;
 const isAuthenticated = (req,res,next) => {
     const token = req.cookies['token'];
     if(!token) return res.redirect('/login');
@@ -74,10 +81,27 @@ const isAuthenticated = (req,res,next) => {
     }
 }
 
-app.get("/submit",isAuthenticated ,(req,res) => {
+app.get('/submit',isAuthenticated , async (req,res) => {
       const token = req.cookies['token'];
       const payload = jwt.verify(token , privatekey);
-      res.render("submit" , {results : payload.documents});
+      try{
+        const userdetails = await UserSchema.find({email: payload.email})
+        const docs = userdetails[0].documents
+        console.log(docs)
+        let decrypteddocurl= '';
+        const newdocs = []
+        docs.forEach((encrypteddocurl) => {
+            decrypteddocurl = cryptr.decrypt(encrypteddocurl);
+            console.log(decrypteddocurl)
+            newdocs.push(decrypteddocurl);
+        })
+        res.render("submit" , {results : newdocs});
+      }
+      catch(ex) {
+          console.log(ex);
+          res.send('couldnt load');
+      }
+      
 });
 
 app.post('/submit' ,isAuthenticated, async (req,res) => {
@@ -92,13 +116,15 @@ app.post('/submit' ,isAuthenticated, async (req,res) => {
         try{
             const user = await UserSchema.findOne({email: currUserEmail});
             const resi = [...user.documents];
-            resi.push(result.secure_url);
+            // resi.push(result.secure_url);
+            const encrypteddocurl = cryptr.encrypt(result.secure_url);
+            resi.push(encrypteddocurl);
             console.log(resi);
             const doc = await UserSchema.findOneAndUpdate({email: currUserEmail}, {documents : resi}, {
                 new: true
               });
             console.log(doc);
-            res.render('submit' , {results : resi});
+            res.redirect('/submit');
         }
         catch(ex){
             return res.send('upload failed . try again bhai');
@@ -127,8 +153,10 @@ app.post('/register' , async (req,res) => {
             if(err) return res.status(400).send('error uploading file');
             // const user = await UserSchema.findOneAndUpdate({ email : currUserEmail } , { document : req.files.img })
                 const docs = []
-                docs.push(result.secure_url);
-                console.log(docs);
+                // docs.push(result.secure_url);
+                // console.log(docs);
+                const encrypteddocurl = cryptr.encrypt(result.secure_url);
+                docs.push(encrypteddocurl);
                 //bcrypt
                 const salt = await bcrypt.genSalt(10);
                 const hashedpwd = await bcrypt.hash(req.body.password , salt);
@@ -136,7 +164,7 @@ app.post('/register' , async (req,res) => {
                 const user = new UserSchema({
                     email : req.body.email,
                     password: hashedpwd,
-                    phNo: req.body.phNo,                                                        /// my modi
+                    phNo: req.body.phNo,  
                     documents: [...docs]
                 })
                 try{
@@ -152,7 +180,6 @@ app.post('/register' , async (req,res) => {
                 }
       })
 })
-/// my modi
 app.get('/verifyPhone' , (req,res) => {
     const token = req.cookies['token'];
     const payload = jwt.verify(token , privatekey);
@@ -203,9 +230,10 @@ app.post('/login' ,async (req,res) => {
     if(!check) return res.status(401).render('login', {message:'Invalid email or password'});
 
     const phNo = userdetails.phNo;                                                                                              /// my modi
-    const token = jwt.sign({ email : userdetails.email , documents : userdetails.documents , phNo: phNo } , privatekey);        /// my modi
+    const token = jwt.sign({ email : userdetails.email  , phNo: phNo } , privatekey);        /// my modi
     res.cookie('token' , token);
-    res.redirect('/verifyPhone');                                                                                               /// my modi
+    // res.redirect('/verifyPhone');
+    // res.redirect('/submit')
 })
 
 // abhi run karo toh and server share karna 
@@ -217,3 +245,4 @@ app.post('/login' ,async (req,res) => {
 // 
 
 // set CLOUDINARY_URL=cloudinary://598792189368595:KXnbhwu-_IDDxJahGzG5bcYn8bw@pradhancloud
+
